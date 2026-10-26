@@ -10,6 +10,7 @@ For more information read **[documentation](https://nextras.org/migrations/docs)
 **Supported databases:**
 * PostgreSQL
 * MySQL
+* SQLite (not with Nextras DBAL)
 
 **Supported DBALs:**
 * [Nextras DBAL](https://github.com/nextras/dbal)

@@ -119,7 +119,7 @@ abstract class IntegrationTestCase extends TestCase
 	protected function createDbal(array $options): IDbal
 	{
 		return match ($options['dbal']) {
-			'dibi' => new DibiAdapter(new Dibi\Connection([
+			'dibi' => new DibiAdapter(new Dibi\Connection(array_merge([
 				'host' => $options['host'],
 				'username' => $options['username'],
 				'password' => $options['password'],
@@ -127,14 +127,18 @@ abstract class IntegrationTestCase extends TestCase
 				'driver' => match ($options['driver']) {
 					'mysql' => 'mysqli',
 					'pgsql' => 'postgre',
+					'sqlite' => 'sqlite3', // Dibi 4.0 has only Sqlite3Driver, newer versions keep it as an alias
 				},
-			])),
+			], $options['driver'] === 'sqlite' ? ['database' => $this->getSqliteFile()] : []))),
 			'doctrine' => new DoctrineAdapter($this->createDoctrineConnection($options)),
-			'nette' => new NetteAdapter(new Nette\Database\Connection(
-				"$options[driver]:host=$options[host];dbname=$options[database]",
-				$options['username'],
-				$options['password']
-			)),
+			'nette' => new NetteAdapter(match ($options['driver']) {
+				'sqlite' => new Nette\Database\Connection('sqlite:' . $this->getSqliteFile()),
+				default => new Nette\Database\Connection(
+					"$options[driver]:host=$options[host];dbname=$options[database]",
+					$options['username'],
+					$options['password']
+				),
+			}),
 			'nextras' => new NextrasAdapter(new Nextras\Dbal\Connection([
 				'host' => $options['host'],
 				'username' => $options['username'],
@@ -152,7 +156,7 @@ abstract class IntegrationTestCase extends TestCase
 
 	protected function createDoctrineConnection(array $options): Doctrine\DBAL\Connection
 	{
-		return Doctrine\DBAL\DriverManager::getConnection([
+		return Doctrine\DBAL\DriverManager::getConnection(array_merge([
 			'host' => $options['host'],
 			'user' => $options['username'],
 			'password' => $options['password'],
@@ -160,8 +164,9 @@ abstract class IntegrationTestCase extends TestCase
 			'driver' => match ($options['driver']) {
 				'mysql' => 'mysqli',
 				'pgsql' => 'pdo_pgsql',
+				'sqlite' => 'pdo_sqlite',
 			},
-		]);
+		], $options['driver'] === 'sqlite' ? ['path' => $this->getSqliteFile()] : []));
 	}
 
 
@@ -170,8 +175,15 @@ abstract class IntegrationTestCase extends TestCase
 		return match ($name) {
 			'mysql' => new Nextras\Migrations\Drivers\MySqlDriver($dbal, 'm'),
 			'pgsql' => new Nextras\Migrations\Drivers\PgSqlDriver($dbal, 'm', $this->dbName),
+			'sqlite' => new Nextras\Migrations\Drivers\SqliteDriver($dbal, 'm'),
 			default => throw new \Exception("Unknown driver '$name'."),
 		};
+	}
+
+
+	protected function getSqliteFile(): string
+	{
+		return TEMP_DIR . '/' . $this->dbName . '.sqlite';
 	}
 
 
